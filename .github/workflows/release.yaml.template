@@ -128,23 +128,27 @@ jobs:
             targets: wasm32-unknown-unknown
             package_ext: .zip
             runner: ubuntu-latest
+            features: windowed
 
           - platform: linux
             targets: x86_64-unknown-linux-gnu
             package_ext: .zip
             runner: ubuntu-latest
+            features: windowed
 
           - platform: windows
             targets: x86_64-pc-windows-msvc
             binary_ext: .exe
             package_ext: .zip
             runner: windows-latest
+            features: windowed
 
           - platform: macos
             targets: x86_64-apple-darwin aarch64-apple-darwin
             app_suffix: .app/Contents/MacOS
             package_ext: .dmg
             runner: macos-latest
+            features: windowed
     runs-on: ${{ matrix.runner }}
     permissions:
       # Required to create a GitHub release: <https://docs.github.com/en/rest/releases/releases#create-a-release>.

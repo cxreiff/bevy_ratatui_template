@@ -3,15 +3,23 @@
 // Disable console on Windows for non-dev builds.
 #![cfg_attr(not(feature = "dev"), windows_subsystem = "windows")]
 
-mod asset_tracking;
-mod audio;
-mod demo;
-#[cfg(feature = "dev")]
-mod dev_tools;
-mod screens;
-mod theme;
+mod draw;
+mod input;
+mod scene;
 
-use bevy::{asset::AssetMetaCheck, prelude::*};
+#[cfg(not(feature = "windowed"))]
+use std::time::Duration;
+
+#[cfg(not(feature = "windowed"))]
+use bevy::app::ScheduleRunnerPlugin;
+#[cfg(feature = "windowed")]
+use bevy::asset::AssetMetaCheck;
+#[cfg(not(feature = "windowed"))]
+use bevy::log::LogPlugin;
+#[cfg(not(feature = "windowed"))]
+use bevy::winit::WinitPlugin;
+use bevy::{diagnostic::FrameTimeDiagnosticsPlugin, prelude::*};
+use bevy_ratatui::RatatuiPlugins;
 
 fn main() -> AppExit {
     App::new().add_plugins(AppPlugin).run()
@@ -21,21 +29,8 @@ pub struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut App) {
-        // Order new `AppSystems` variants by adding them here:
-        app.configure_sets(
-            Update,
-            (
-                AppSystems::TickTimers,
-                AppSystems::RecordInput,
-                AppSystems::Update,
-            )
-                .chain(),
-        );
-
-        // Spawn the main camera.
-        app.add_systems(Startup, spawn_camera);
-
-        // Add Bevy plugins.
+        // Bevy plugins for windowed mode.
+        #[cfg(feature = "windowed")]
         app.add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
@@ -45,6 +40,7 @@ impl Plugin for AppPlugin {
                     meta_check: AssetMetaCheck::Never,
                     ..default()
                 })
+                .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: Window {
                         title: "{{project-name | title_case}}".to_string(),
@@ -56,31 +52,30 @@ impl Plugin for AppPlugin {
                 }),
         );
 
-        // Add other plugins.
+        // Bevy plugins for terminal mode.
+        #[cfg(not(feature = "windowed"))]
         app.add_plugins((
-            asset_tracking::plugin,
-            demo::plugin,
-            #[cfg(feature = "dev")]
-            dev_tools::plugin,
-            screens::plugin,
-            theme::plugin,
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .disable::<WinitPlugin>()
+                .disable::<LogPlugin>(),
+            ScheduleRunnerPlugin::run_loop(Duration::from_secs_f32(1. / 60.)),
         ));
+
+        // Plugins common to both modes.
+        app.insert_resource(ClearColor(Color::srgba(0., 0., 0., 0.)))
+            .add_plugins((
+                FrameTimeDiagnosticsPlugin {
+                    smoothing_factor: 1.0,
+                    ..default()
+                },
+                RatatuiPlugins {
+                    enable_mouse_capture: true,
+                    ..default()
+                },
+                draw::plugin,
+                input::plugin,
+                scene::plugin,
+            ));
     }
-}
-
-/// High-level groupings of systems for the app in the `Update` schedule.
-/// When adding a new variant, make sure to order it in the `configure_sets`
-/// call above.
-#[derive(SystemSet, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-enum AppSystems {
-    /// Tick timers.
-    TickTimers,
-    /// Record player input.
-    RecordInput,
-    /// Do everything else (consider splitting this into further variants).
-    Update,
-}
-
-fn spawn_camera(mut commands: Commands) {
-    commands.spawn((Name::new("Camera"), Camera2d));
 }
