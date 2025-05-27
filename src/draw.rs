@@ -3,13 +3,14 @@ use bevy::{
     prelude::*,
 };
 use bevy_ratatui::RatatuiContext;
-use bevy_ratatui_camera::RatatuiCameraWidget;
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
     style::{Style, Stylize},
-    widgets::{Block, Widget},
+    widgets::Block,
 };
+
+use crate::scene::Star;
 
 pub fn plugin(app: &mut App) {
     app.init_resource::<Flags>()
@@ -23,13 +24,26 @@ pub struct Flags {
 
 fn draw_system(
     mut ratatui: ResMut<RatatuiContext>,
-    mut camera: Single<&mut RatatuiCameraWidget>,
+    stars: Query<&Star>,
     flags: Res<Flags>,
     diagnostics: Res<DiagnosticsStore>,
 ) -> Result {
     ratatui.draw(|frame| {
         let area = debug_frame(frame, &flags, &diagnostics);
-        camera.render(area, frame.buffer_mut());
+
+        let buffer = frame.buffer_mut();
+        for star in &stars {
+            if !area.contains((star.col, star.row).into()) {
+                continue;
+            }
+
+            let Some(cell) = buffer.cell_mut((star.col, star.row)) else {
+                continue;
+            };
+
+            cell.fg = star.color;
+            cell.set_char('@');
+        }
     })?;
 
     Ok(())

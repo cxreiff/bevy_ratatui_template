@@ -1,51 +1,63 @@
-use bevy::prelude::*;
-use bevy_ratatui_camera::{RatatuiCamera, RatatuiCameraPlugin, RatatuiCameraStrategy};
+use std::time::Duration;
+
+use bevy::{prelude::*, time::common_conditions::on_timer};
+use bevy_ratatui::RatatuiContext;
+use rand_chacha::{
+    ChaCha8Rng,
+    rand_core::{RngCore, SeedableRng},
+};
+use ratatui::layout::Size;
 
 pub fn plugin(app: &mut App) {
-    app.add_plugins(RatatuiCameraPlugin)
-        .add_systems(Startup, (camera_setup, scene_setup))
-        .add_systems(Update, spin_system);
+    app.init_resource::<StarRng>().add_systems(
+        Update,
+        (
+            star_spawn_system.run_if(on_timer(Duration::from_millis(100))),
+            star_move_system.run_if(on_timer(Duration::from_millis(50))),
+        ),
+    );
 }
 
 #[derive(Component, Debug, Default)]
-pub struct Spinner;
-
-fn camera_setup(mut commands: Commands) {
-    commands.spawn((
-        Camera {
-            order: 1,
-            ..default()
-        },
-        Camera3d::default(),
-        Transform::from_xyz(2., 2., 2.).looking_at(Vec3::ZERO, Vec3::Y),
-        RatatuiCamera::default(),
-        RatatuiCameraStrategy::luminance_misc(),
-    ));
+pub struct Star {
+    pub row: u16,
+    pub col: u16,
+    pub color: ratatui::style::Color,
 }
 
-fn scene_setup(
+#[derive(Resource, Deref, DerefMut)]
+pub struct StarRng(ChaCha8Rng);
+
+impl Default for StarRng {
+    fn default() -> Self {
+        Self(ChaCha8Rng::seed_from_u64(19878367467712))
+    }
+}
+
+fn star_spawn_system(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    commands.spawn((
-        Spinner,
-        Mesh3d(meshes.add(Cuboid::default())),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.4, 0.54, 0.7),
-            ..Default::default()
-        })),
-    ));
-    commands.spawn((
-        PointLight {
-            intensity: 2_000_000.,
-            shadows_enabled: true,
-            ..Default::default()
-        },
-        Transform::from_xyz(3., 4., 6.),
-    ));
+    ratatui: Res<RatatuiContext>,
+    mut rng: ResMut<StarRng>,
+) -> Result {
+    let Size { width, height } = ratatui.size()?;
+    commands.spawn(Star {
+        row: (rng.next_u32() % height as u32) as u16,
+        col: (rng.next_u32() % width as u32) as u16,
+        color: ratatui::style::Color::Rgb(
+            (rng.next_u32() % 256) as u8,
+            (rng.next_u32() % 256) as u8,
+            (rng.next_u32() % 256) as u8,
+        ),
+    });
+
+    Ok(())
 }
 
-fn spin_system(mut spinner: Single<&mut Transform, With<Spinner>>, time: Res<Time>) {
-    spinner.rotate_y(time.delta_secs());
+fn star_move_system(mut stars: Query<&mut Star>, mut rng: ResMut<StarRng>) {
+    for mut star in &mut stars {
+        let x_delta = (rng.next_u32() % 3) as i32 - 1;
+        let y_delta = (rng.next_u32() % 3) as i32 - 1;
+        star.row = (star.row as i32 + y_delta).max(0) as u16;
+        star.col = (star.col as i32 + x_delta).max(0) as u16;
+    }
 }
