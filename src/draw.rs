@@ -42,7 +42,7 @@ fn draw_system(
             };
 
             cell.fg = star.color;
-            cell.set_char('@');
+            cell.set_char(star.character);
         }
     })?;
 

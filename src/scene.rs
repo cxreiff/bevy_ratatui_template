@@ -2,11 +2,14 @@ use std::time::Duration;
 
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use bevy_ratatui::RatatuiContext;
+use rand::seq::SliceRandom;
 use rand_chacha::{
     ChaCha8Rng,
     rand_core::{RngCore, SeedableRng},
 };
 use ratatui::layout::Size;
+
+static CHARACTERS: &[char] = &['@', '#', '%', '&', '*', '=', '$'];
 
 pub fn plugin(app: &mut App) {
     app.init_resource::<StarRng>().add_systems(
@@ -23,6 +26,7 @@ pub struct Star {
     pub row: u16,
     pub col: u16,
     pub color: ratatui::style::Color,
+    pub character: char,
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -48,6 +52,7 @@ fn star_spawn_system(
             (rng.next_u32() % 256) as u8,
             (rng.next_u32() % 256) as u8,
         ),
+        character: *CHARACTERS.choose(&mut rng.0).unwrap(),
     });
 
     Ok(())
